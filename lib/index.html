@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge">
+  <meta name="description" content="Aplikacja do prezentacji wyników pomiarów z sensorów IoT w wielu seriach.">
+
+  <link rel="icon" type="image/png" href="favicon.png"/>
+  <title>Serie Pomiarowe IoT</title>
+  <link rel="manifest" href="manifest.json">
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background-color: #ffffff;
+      color: #111827;
+      font-family: Roboto, Arial, sans-serif;
+    }
+
+    /* Wymaganie T7: widok modyfikowany regułami @media print ukrywającymi kontrolki */
+    @media print {
+      .no-print,
+      button,
+      input,
+      select,
+      textarea,
+      nav,
+      form {
+        display: none !important;
+      }
+
+      html, body, flt-glass-pane {
+        width: 100% !important;
+        height: auto !important;
+        overflow: visible !important;
+        background: #ffffff !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <script>
+    window.addEventListener('DOMContentLoaded', function () {
+      const observer = new MutationObserver(function () {
+        if (window.flutterConfiguration == null) {
+          window.flutterConfiguration = {};
+        }
+      });
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+    });
+  </script>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>
