@@ -583,7 +583,7 @@ class _AdminManagementPanelState extends State<AdminManagementPanel> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Text(
-              'Panel administratora (F3, F4, F12)',
+              'Panel administratora',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
             if (_busyAction || _loadingSensors) ...[
@@ -683,7 +683,7 @@ class _AdminManagementPanelState extends State<AdminManagementPanel> {
               ),
             const Divider(height: 28),
             const Text(
-              'Zarządzanie czujnikami (F12)',
+              'Zarządzanie czujnikami',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
             ),
             const SizedBox(height: 8),

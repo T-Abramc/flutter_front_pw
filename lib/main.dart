@@ -96,8 +96,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _isAuthDropdownOpen = false;
       _isPrintMode = true;
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      triggerBrowserPrint();
+    Future.delayed(const Duration(milliseconds: 150), () {
+      if (mounted) {
+        triggerBrowserPrint();
+      }
     });
   }
 
@@ -226,94 +228,124 @@ class _DashboardScreenState extends State<DashboardScreen> {
         .toList();
   }
 
+  String? _resolveSingleOrCommonUnit(List<Series> activeSeries) {
+    if (activeSeries.length == 1) {
+      final u = activeSeries.first.unit?.trim();
+      if (u != null && u.isNotEmpty) return u;
+      return null;
+    }
+    if (activeSeries.length > 1) {
+      final units = activeSeries.map((s) => (s.unit ?? '').trim()).toSet();
+      if (units.length == 1 && units.first.isNotEmpty) {
+        return units.first;
+      }
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final activeSeries = _allSeries.where((s) => _selectedSeriesIds.contains(s.id)).toList();
     final tableRows = _buildTableRows();
 
-    return Scaffold(
-      appBar: _isPrintMode
-          ? null
-          : AppBar(
-              title: const Text('Pomiary IoT', style: TextStyle(fontSize: 18)),
-              actions: [
-                IconButton(
-                  tooltip: 'Drukuj wykres i tabelę',
-                  onPressed: _handlePrintClick,
-                  icon: const Icon(Icons.print),
-                ),
-                IconButton(
-                  tooltip: 'Odśwież dane z API',
-                  onPressed: _loadInitialData,
-                  icon: const Icon(Icons.refresh),
-                ),
-                AuthHeaderStatusWidget(
-                  apiClient: widget.apiClient,
-                  statusLabel: _authStatusLabel,
-                  onToggleDropdown: () =>
-                      setState(() => _isAuthDropdownOpen = !_isAuthDropdownOpen),
-                ),
-              ],
-            ),
-      body: Stack(
-        children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isMobile = constraints.maxWidth < 600;
-              return SingleChildScrollView(
-                padding: EdgeInsets.all(isMobile ? 8 : 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+    final contentColumn = LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth > 0 ? constraints.maxWidth : 1024.0;
+        final isMobile = width < 600;
+        final padding = _isPrintMode
+            ? const EdgeInsets.all(6)
+            : EdgeInsets.all(isMobile ? 8 : 16);
+
+        return Padding(
+          padding: padding,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_isPrintMode) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    if (_isPrintMode) ...[
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Raport pomiarowy – wykres i tabela',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                          ),
-                          TextButton.icon(
-                            onPressed: () => setState(() => _isPrintMode = false),
-                            icon: const Icon(Icons.visibility),
-                            label: const Text('Wyjdź z podglądu wydruku'),
-                          ),
-                        ],
+                    const Expanded(
+                      child: Text(
+                        'Raport pomiarowy – wykres i tabela',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                       ),
-                      const SizedBox(height: 8),
-                    ],
-                    if (!_isPrintMode) ...[
-                      if (_isLoading) const LinearProgressIndicator(),
-                      if (_errorMessage != null)
-                        Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.all(12),
-                          color: Colors.red.shade100,
-                          child: Text(
-                            'Błąd komunikacji z serwerem: $_errorMessage',
-                            style: TextStyle(color: Colors.red.shade900),
-                          ),
-                        ),
-                      _buildFiltersCard(isMobile),
-                      const SizedBox(height: 16),
-                    ],
-                    _buildChartCard(activeSeries, isMobile),
-                    const SizedBox(height: 16),
-                    _buildTableCard(activeSeries, tableRows),
-                    if (!_isPrintMode && widget.apiClient.isLoggedIn) ...[
-                      const SizedBox(height: 20),
-                      AdminManagementPanel(
-                        apiClient: widget.apiClient,
-                        seriesList: _allSeries,
-                        onDataChanged: _loadInitialData,
-                      ),
-                    ],
+                    ),
+                    TextButton.icon(
+                      onPressed: () => setState(() => _isPrintMode = false),
+                      icon: const Icon(Icons.visibility),
+                      label: const Text('Wyjdź z podglądu wydruku'),
+                    ),
                   ],
                 ),
-              );
-            },
+                const SizedBox(height: 8),
+              ],
+              if (!_isPrintMode) ...[
+                if (_isLoading) const LinearProgressIndicator(),
+                if (_errorMessage != null)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(12),
+                    color: Colors.red.shade100,
+                    child: Text(
+                      'Błąd komunikacji z serwerem: $_errorMessage',
+                      style: TextStyle(color: Colors.red.shade900),
+                    ),
+                  ),
+                _buildFiltersCard(isMobile),
+                const SizedBox(height: 16),
+              ],
+              _buildChartCard(activeSeries, isMobile, width),
+              const SizedBox(height: 16),
+              _buildTableCard(activeSeries, tableRows),
+              if (!_isPrintMode && widget.apiClient.isLoggedIn) ...[
+                const SizedBox(height: 20),
+                AdminManagementPanel(
+                  apiClient: widget.apiClient,
+                  seriesList: _allSeries,
+                  onDataChanged: _loadInitialData,
+                ),
+              ],
+            ],
           ),
-          if (!_isPrintMode && _isAuthDropdownOpen)
+        );
+      },
+    );
+
+    if (_isPrintMode) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        body: SingleChildScrollView(child: contentColumn),
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Pomiary IoT', style: TextStyle(fontSize: 18)),
+        actions: [
+          IconButton(
+            tooltip: 'Drukuj wykres i tabelę',
+            onPressed: _handlePrintClick,
+            icon: const Icon(Icons.print),
+          ),
+          IconButton(
+            tooltip: 'Odśwież dane z API',
+            onPressed: _loadInitialData,
+            icon: const Icon(Icons.refresh),
+          ),
+          AuthHeaderStatusWidget(
+            apiClient: widget.apiClient,
+            statusLabel: _authStatusLabel,
+            onToggleDropdown: () =>
+                setState(() => _isAuthDropdownOpen = !_isAuthDropdownOpen),
+          ),
+        ],
+      ),
+      body: Stack(
+        children: [
+          SingleChildScrollView(child: contentColumn),
+          if (_isAuthDropdownOpen)
             Positioned(
               top: 8,
               right: 12,
@@ -341,7 +373,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Filtrowanie (F5): Przedział czasu i widoczne serie',
+              'Filtrowanie: Przedział czasu i widoczne serie',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
@@ -422,12 +454,172 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildChartCard(List<Series> activeSeries, bool isMobile) {
+  Widget _buildChartCard(List<Series> activeSeries, bool isMobile, double availableWidth) {
     final visibleMeasurements = _measurements
         .where((m) => _selectedSeriesIds.contains(m.seriesId))
         .toList();
+    final unitLabel = _resolveSingleOrCommonUnit(activeSeries);
+
+    double? minX;
+    double? maxX;
+    double xInterval = 1;
+
+    if (visibleMeasurements.isNotEmpty) {
+      final timestamps = visibleMeasurements
+          .map((m) => m.timestamp.millisecondsSinceEpoch.toDouble())
+          .toList()
+        ..sort();
+      final rawMinX = timestamps.first;
+      final rawMaxX = timestamps.last;
+      final span = (rawMaxX - rawMinX).abs();
+      final pad = span > 0 ? span * 0.03 : 60000.0;
+      minX = rawMinX - pad;
+      maxX = rawMaxX + pad;
+
+      final totalSpan = (maxX - minX).abs();
+      final desiredTicks = isMobile ? 4.0 : (availableWidth / 150.0).clamp(4.0, 8.0);
+      xInterval = totalSpan > 0 ? (totalSpan / desiredTicks) : 60000.0;
+    }
+
+    final chartWidget = LineChart(
+      LineChartData(
+        minX: minX,
+        maxX: maxX,
+        clipData: const FlClipData.all(),
+        gridData: const FlGridData(show: true),
+        borderData: FlBorderData(show: true),
+        lineTouchData: LineTouchData(
+          enabled: !_isPrintMode,
+          handleBuiltInTouches: true,
+          touchCallback: (event, response) {
+            if (event is FlTapUpEvent &&
+                response != null &&
+                response.lineBarSpots != null &&
+                response.lineBarSpots!.isNotEmpty) {
+              final spot = response.lineBarSpots!.first;
+              final ts = DateTime.fromMillisecondsSinceEpoch(spot.x.toInt());
+              setState(() {
+                _selectedTimestamp = ts;
+                _highlightedMeasurementIds = visibleMeasurements
+                    .where((m) => m.timestamp.millisecondsSinceEpoch == spot.x.toInt())
+                    .map((m) => m.id)
+                    .toSet();
+              });
+            }
+          },
+        ),
+        titlesData: FlTitlesData(
+          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          leftTitles: AxisTitles(
+            axisNameSize: unitLabel != null ? 24 : 0,
+            axisNameWidget: unitLabel != null
+                ? Center(
+                    child: Text(
+                      unitLabel,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  )
+                : null,
+            sideTitles: const SideTitles(
+              showTitles: true,
+              reservedSize: 44,
+            ),
+          ),
+          bottomTitles: AxisTitles(
+            axisNameSize: 22,
+            axisNameWidget: const Padding(
+              padding: EdgeInsets.only(top: 4),
+              child: Text(
+                '[data]',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+              ),
+            ),
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 38,
+              interval: xInterval,
+              getTitlesWidget: (value, meta) {
+                if (value < meta.min || value > meta.max) {
+                  return const SizedBox.shrink();
+                }
+                final dt = DateTime.fromMillisecondsSinceEpoch(value.toInt());
+                return Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    DateFormat('HH:mm\ndd.MM').format(dt),
+                    style: const TextStyle(fontSize: 10),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        lineBarsData: List.generate(activeSeries.length, (idx) {
+          final series = activeSeries[idx];
+          final seriesPoints = visibleMeasurements
+              .where((m) => m.seriesId == series.id)
+              .toList()
+            ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+          return LineChartBarData(
+            spots: seriesPoints
+                .map((m) => FlSpot(
+                      m.timestamp.millisecondsSinceEpoch.toDouble(),
+                      m.value,
+                    ))
+                .toList(),
+            isCurved: false,
+            color: series.flutterColor,
+            barWidth: 2.5,
+            dashArray: idx % 2 == 1 ? [6, 3] : null,
+            dotData: FlDotData(
+              show: true,
+              getDotPainter: (spot, percent, barData, spotIndex) {
+                final m = seriesPoints[spotIndex];
+                final isHighlighted = _highlightedMeasurementIds.contains(m.id) ||
+                    (_selectedTimestamp != null &&
+                        m.timestamp.millisecondsSinceEpoch ==
+                            _selectedTimestamp!.millisecondsSinceEpoch);
+                return _getDotPainter(idx, series.flutterColor, isHighlighted);
+              },
+            ),
+          );
+        }),
+      ),
+    );
+
+    // Ramka ograniczająca wykres: w trybie wydruku zwęża i skaluje wykres w dół, aby nie ucinało prawej strony
+    final constrainedChart = _isPrintMode
+        ? ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: (availableWidth - 36).clamp(240.0, 620.0),
+              maxHeight: 220,
+            ),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: SizedBox(
+                width: 680,
+                height: 230,
+                child: chartWidget,
+              ),
+            ),
+          )
+        : SizedBox(
+            height: isMobile ? 270 : 350,
+            width: double.infinity,
+            child: chartWidget,
+          );
 
     return Card(
+      elevation: _isPrintMode ? 0 : 1,
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
@@ -438,7 +630,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 const Expanded(
                   child: Text(
-                    'Wykres pomiarów w funkcji czasu (F2, F6)',
+                    'Wykres pomiarów w funkcji czasu',
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -460,86 +652,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: Center(child: Text('Brak wyników pomiarów w wybranym zakresie.')),
               )
             else
-              SizedBox(
-                height: isMobile ? 260 : 340,
-                child: LineChart(
-                  LineChartData(
-                    gridData: const FlGridData(show: true),
-                    borderData: FlBorderData(show: true),
-                    lineTouchData: LineTouchData(
-                      handleBuiltInTouches: true,
-                      touchCallback: (event, response) {
-                        if (event is FlTapUpEvent &&
-                            response != null &&
-                            response.lineBarSpots != null &&
-                            response.lineBarSpots!.isNotEmpty) {
-                          final spot = response.lineBarSpots!.first;
-                          final ts = DateTime.fromMillisecondsSinceEpoch(spot.x.toInt());
-                          setState(() {
-                            _selectedTimestamp = ts;
-                            _highlightedMeasurementIds = visibleMeasurements
-                                .where((m) => m.timestamp.millisecondsSinceEpoch == spot.x.toInt())
-                                .map((m) => m.id)
-                                .toSet();
-                          });
-                        }
-                      },
-                    ),
-                    titlesData: FlTitlesData(
-                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      bottomTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          reservedSize: 36,
-                          getTitlesWidget: (value, meta) {
-                            final dt = DateTime.fromMillisecondsSinceEpoch(value.toInt());
-                            return Padding(
-                              padding: const EdgeInsets.only(top: 6),
-                              child: Text(
-                                DateFormat('HH:mm\ndd.MM').format(dt),
-                                style: const TextStyle(fontSize: 10),
-                                textAlign: TextAlign.center,
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                    lineBarsData: List.generate(activeSeries.length, (idx) {
-                      final series = activeSeries[idx];
-                      final seriesPoints = visibleMeasurements
-                          .where((m) => m.seriesId == series.id)
-                          .toList()
-                        ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
-
-                      return LineChartBarData(
-                        spots: seriesPoints
-                            .map((m) => FlSpot(
-                                  m.timestamp.millisecondsSinceEpoch.toDouble(),
-                                  m.value,
-                                ))
-                            .toList(),
-                        isCurved: false,
-                        color: series.flutterColor,
-                        barWidth: 2.5,
-                        dashArray: idx % 2 == 1 ? [6, 3] : null,
-                        dotData: FlDotData(
-                          show: true,
-                          getDotPainter: (spot, percent, barData, spotIndex) {
-                            final m = seriesPoints[spotIndex];
-                            final isHighlighted = _highlightedMeasurementIds.contains(m.id) ||
-                                (_selectedTimestamp != null &&
-                                    m.timestamp.millisecondsSinceEpoch ==
-                                        _selectedTimestamp!.millisecondsSinceEpoch);
-                            return _getDotPainter(idx, series.flutterColor, isHighlighted);
-                          },
-                        ),
-                      );
-                    }),
-                  ),
-                ),
-              ),
+              constrainedChart,
           ],
         ),
       ),
@@ -548,13 +661,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildTableCard(List<Series> activeSeries, List<TableRowData> rows) {
     return Card(
+      elevation: _isPrintMode ? 0 : 1,
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Tabela pomiarów (F2, F6 – kliknij wiersz, aby wyróżnić punkt na wykresie)',
+              'Tabela pomiarów',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
@@ -598,18 +712,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         if (isSelected) return Colors.amber.withValues(alpha: 0.35);
                         return null;
                       }),
-                      onSelectChanged: (_) {
-                        setState(() {
-                          if (isSelected) {
-                            _selectedTimestamp = null;
-                            _highlightedMeasurementIds.clear();
-                          } else {
-                            _selectedTimestamp = row.timestamp;
-                            _highlightedMeasurementIds =
-                                row.bySeries.values.map((m) => m.id).toSet();
-                          }
-                        });
-                      },
+                      onSelectChanged: _isPrintMode
+                          ? null
+                          : (_) {
+                              setState(() {
+                                if (isSelected) {
+                                  _selectedTimestamp = null;
+                                  _highlightedMeasurementIds.clear();
+                                } else {
+                                  _selectedTimestamp = row.timestamp;
+                                  _highlightedMeasurementIds =
+                                      row.bySeries.values.map((m) => m.id).toSet();
+                                }
+                              });
+                            },
                       cells: [
                         DataCell(Text(_dateTimeFmt.format(row.timestamp))),
                         ...activeSeries.map((s) {

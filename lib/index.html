@@ -22,7 +22,10 @@
       font-family: Roboto, Arial, sans-serif;
     }
 
-    /* Wymaganie T7: widok modyfikowany regułami @media print ukrywającymi kontrolki */
+    @page {
+      margin: 10mm;
+    }
+
     @media print {
       .no-print,
       button,
@@ -34,10 +37,13 @@
         display: none !important;
       }
 
-      html, body, flt-glass-pane {
+      html, body, flt-glass-pane, flutter-view {
         width: 100% !important;
+        max-width: 100% !important;
         height: auto !important;
+        min-height: 0 !important;
         overflow: visible !important;
+        position: static !important;
         background: #ffffff !important;
       }
     }
