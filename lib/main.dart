@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:flutter_front_pw/admin_dialogs.dart';
 import 'package:flutter_front_pw/api_client.dart';
 import 'package:flutter_front_pw/Models.dart';
-import 'package:flutter_front_pw/print_bridge.dart'; //++
+import 'package:flutter_front_pw/print_bridge.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
